@@ -1,5 +1,6 @@
-import { log } from 'console'
 import { Router } from 'express'
+import { loginController, registerController } from '~/controllers/users.controllers'
+import { loginValidator } from '~/middlewares/users.middlewares'
 
 const usersRoutes = Router()
 
@@ -8,14 +9,7 @@ usersRoutes.use((req, res, next) => {
   next()
 })
 
-usersRoutes.get('/tweets', (req, res) => {
-  res.json({
-    data: [
-      { name: 'Điêpkj', yob: 1999 },
-      { name: 'Được', yob: 1994 },
-      { name: 'Hùng', yob: 2004 }
-    ]
-  })
-})
+usersRoutes.post('/login', loginValidator, loginController)
+usersRoutes.post('/register', registerController)
 
 export default usersRoutes
