@@ -3,7 +3,8 @@ import { config } from 'dotenv' // này phải install nha
 import User from '~/models/schemas/User.schemas'
 config() // config này giúp sử dụng biến của file đó
 
-const uri = `mongodb+srv://${process.env.DB_USERNAME}:${process.env.DB_PASSWORD}@tweetprojectk18f3.ccbegek.mongodb.net/?retryWrites=true&w=majority&appName=tweetProjectK18F3`
+const uri = `mongodb+srv://${process.env.DB_USERNAME}:${process.env.DB_PASSWORD}@tw-home3.jbvmt.mongodb.net/?retryWrites=true&w=majority&appName=TW-HOME3`
+
 // tạo class cho nó tường minh thôi
 class DatabaseService {
   private client: MongoClient

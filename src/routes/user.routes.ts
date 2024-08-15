@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { loginController, registerController } from '~/controllers/users.controllers'
-import { loginValidator } from '~/middlewares/users.middlewares'
+import { loginValidator, registerValidator } from '~/middlewares/users.middlewares'
 
 const usersRoutes = Router()
 
@@ -10,6 +10,18 @@ usersRoutes.use((req, res, next) => {
 })
 
 usersRoutes.post('/login', loginValidator, loginController)
-usersRoutes.post('/register', registerController)
+
+/*
+Descriptor : Register new user
+Path: /register
+Method: POST
+body:{
+    email:string
+    password:string
+    confirm_password:string // bởi vì đây là qui ước trong các collec trong MG là snacke case
+    date_of_birth:string (thep chuẩn ISO8601)
+}
+*/
+usersRoutes.post('/register', registerValidator, registerController)
 
 export default usersRoutes
