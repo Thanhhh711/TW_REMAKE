@@ -1,10 +1,13 @@
+import { ObjectId } from 'mongodb'
 import { TokenType } from './../constants/enums'
 import { Request, Response, NextFunction } from 'express'
 import databaseService from './database.services'
 import User from '~/models/schemas/User.schemas'
-import { RegisterReqBody } from '~/models/requests/User.requests'
+import { LogoutReqBody, RegisterReqBody } from '~/models/requests/User.requests'
 import { hashPassword } from '~/utils/crypto'
 import { signToken } from '~/utils/jwt'
+import RefreshToken from '~/models/schemas/RefreshToken.schemas'
+import { USERS_MESSAGES } from '~/constants/messages'
 
 class UserSerivce {
   // hàm nhận vào user_id và bỏ vào payload
@@ -22,9 +25,26 @@ class UserSerivce {
     })
   }
 
+  private signToken(user_id: string) {
+    return Promise.all([
+      this.signAccessToken(user_id),
+      this.signRefreshToken(user_id)
+    ])
+  }
+
   async checkEmail(email: string) {
     const user = await databaseService.users.findOne({ email })
     return user
+  }
+
+  async login(user_id: string) {
+    const [access_token, refresh_token] = await this.signToken(user_id)
+
+    await databaseService.refreshTokens.insertOne(
+      new RefreshToken({ user_id: new ObjectId(user_id), token: refresh_token })
+    )
+
+    return { access_token, refresh_token }
   }
 
   async register(payload: RegisterReqBody) {
@@ -43,7 +63,22 @@ class UserSerivce {
       this.signRefreshToken(user_id)
     ])
 
-    return [access_token, refresh_token]
+    await databaseService.refreshTokens.insertOne(
+      new RefreshToken({
+        user_id: new ObjectId(user_id),
+        token: refresh_token
+      })
+    )
+
+    return { access_token, refresh_token }
+  }
+
+  async logout(payload: LogoutReqBody) {
+    //  xóa token trong db
+    await databaseService.refreshTokens.deleteOne({
+      token: payload.refresh_token
+    })
+    return { message: USERS_MESSAGES.LOGOUT_SUCCESS }
   }
 }
 

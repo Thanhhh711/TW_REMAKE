@@ -1,6 +1,7 @@
 import { Collection, Db, MongoClient, ServerApiVersion } from 'mongodb'
 import { config } from 'dotenv' // này phải install nha
 import User from '~/models/schemas/User.schemas'
+import RefreshToken from '~/models/schemas/RefreshToken.schemas'
 config() // config này giúp sử dụng biến của file đó
 
 const uri = `mongodb+srv://${process.env.DB_USERNAME}:${process.env.DB_PASSWORD}@tw-home3.jbvmt.mongodb.net/?retryWrites=true&w=majority&appName=TW-HOME3`
@@ -17,7 +18,9 @@ class DatabaseService {
   async connect() {
     try {
       await this.db.command({ ping: 1 })
-      console.log('Pinged your deployment. You successfully connected to MongoDB!')
+      console.log(
+        'Pinged your deployment. You successfully connected to MongoDB!'
+      )
     } catch (error) {
       console.log(error)
       console.log(error)
@@ -28,6 +31,12 @@ class DatabaseService {
 
   get users(): Collection<User> {
     return this.db.collection(process.env.DB_USERS_COLLECTION as string)
+  }
+
+  get refreshTokens(): Collection<RefreshToken> {
+    return this.db.collection(
+      process.env.DB_REFRESH_TOKENS_COLLECTION as string
+    )
   }
 }
 
