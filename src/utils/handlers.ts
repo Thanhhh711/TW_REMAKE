@@ -2,8 +2,8 @@ import { NextFunction, Request, RequestHandler, Response } from 'express'
 
 // kiểu currying
 export const wrarpAsync =
-  (func: RequestHandler) =>
-  async (req: Request, res: Response, next: NextFunction) => {
+  <P>(func: RequestHandler<P>) =>
+  async (req: Request<P>, res: Response, next: NextFunction) => {
     try {
       await func(req, res, next)
     } catch (error) {

@@ -3,13 +3,16 @@ import {
   emailVerifyController,
   forgotPasswordController,
   getMeController,
+  getProfileController,
   loginController,
   logoutController,
   registerController,
   resendEmailVerifyController,
   resetPasswordController,
+  updateMeController,
   verifyForgotPasswordTokenController
 } from '~/controllers/users.controllers'
+import { filterMiddleware } from '~/middlewares/common.middlewares'
 import {
   accessTokenValidator,
   emailVerifyTokenValidator,
@@ -18,8 +21,11 @@ import {
   refreshTokenValidator,
   registerValidator,
   resetPassWordValidator,
-  verifyForgotPasswordValidator
+  updateMeValidator,
+  verifyForgotPasswordValidator,
+  verifyUserValidator
 } from '~/middlewares/users.middlewares'
+import { UpdateMeReqBody } from '~/models/requests/User.requests'
 import { wrarpAsync } from '~/utils/handlers'
 
 const usersRoutes = Router()
@@ -126,7 +132,43 @@ usersRoutes.post(
   wrarpAsync(resetPasswordController)
 )
 
-//  buổi 31
-usersRoutes.post('/me', accessTokenValidator, wrarpAsync(getMeController))
+//  buổi 31(đoạn đầu)
+/*
+  des: get profile của user
+  path: '/me'
+  method: get
+  Header: {Authorization: Bearer <access_token>}
+  body: {}
+  */
+usersRoutes.get('/me', accessTokenValidator, wrarpAsync(getMeController)),
+  // updated
+  usersRoutes.patch(
+    '/me',
+    accessTokenValidator,
+    verifyUserValidator,
+    filterMiddleware<UpdateMeReqBody>([
+      'name',
+      'date_of_birth',
+      'bio',
+      'location',
+      'website',
+      'username',
+      'avatar',
+      'cover_photo'
+    ]),
+    updateMeValidator,
+    wrarpAsync(updateMeController)
+  )
+
+/**
+ * des: get profile của user khác bằng unsername
+ * path: '/:username'
+ * method: get
+ * không cần header vì, chưa đăng nhập cũng có thể xem
+ *
+ *
+ */
+
+usersRoutes.get('/:username', wrarpAsync(getProfileController))
 
 export default usersRoutes

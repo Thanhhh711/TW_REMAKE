@@ -4,13 +4,19 @@ import { TokenType, UserVerifyStatus } from './../constants/enums'
 import { Request, Response, NextFunction } from 'express'
 import databaseService from './database.services'
 import User from '~/models/schemas/User.schemas'
-import { LogoutReqBody, RegisterReqBody } from '~/models/requests/User.requests'
+import {
+  LogoutReqBody,
+  RegisterReqBody,
+  UpdateMeReqBody
+} from '~/models/requests/User.requests'
 import { hashPassword } from '~/utils/crypto'
 import { signToken, verifyToken } from '~/utils/jwt'
 import RefreshToken from '~/models/schemas/RefreshToken.schemas'
 import { USERS_MESSAGES } from '~/constants/messages'
 import { config } from 'dotenv'
 import { update } from 'lodash'
+import { ErrorWithStatus } from '~/models/Errors'
+import HTTP_STATUS from '~/constants/httpStatus'
 
 config()
 class UserSerivce {
@@ -22,26 +28,54 @@ class UserSerivce {
   }
 
   // hàm nhận vào user_id và bỏ vào payload
-  private signAccessToken(user_id: string) {
+  private signAccessToken({
+    user_id,
+    verify
+  }: {
+    user_id: string
+    verify: UserVerifyStatus
+  }) {
+    //
     return signToken({
-      payload: { user_id, token_type: TokenType.AccessToken },
+      payload: { user_id, token_type: TokenType.AccessToken, verify },
       options: { expiresIn: process.env.ACCESS_TOKEN_EXPIRE_IN },
       privateKey: process.env.JWT_SECRET_ACCESS_TOKEN as string
     })
   }
 
-  private signRefreshToken(user_id: string) {
-    return signToken({
-      payload: { user_id, token_type: TokenType.RefreshToken },
-      options: { expiresIn: process.env.REFRESH_TOKEN_EXPIRE_IN },
-      privateKey: process.env.JWT_SECRET_REFRESH_TOKEN as string
-    })
+  private signRefreshToken({
+    user_id,
+    verify,
+    exp
+  }: {
+    user_id: string
+    verify: UserVerifyStatus
+    exp?: number
+  }) {
+    if (exp) {
+      return signToken({
+        payload: { user_id, verify, token_type: TokenType.RefreshToken, exp },
+        privateKey: process.env.JWT_SECRET_REFRESH_TOKEN as string
+      })
+    } else {
+      return signToken({
+        payload: { user_id, token_type: TokenType.RefreshToken },
+        options: { expiresIn: process.env.REFRESH_TOKEN_EXPIRE_IN },
+        privateKey: process.env.JWT_SECRET_REFRESH_TOKEN as string
+      })
+    }
   }
 
   //  ký emailVerifyToken
-  private signEmailVerifyToken(user_id: string) {
+  private signEmailVerifyToken({
+    user_id,
+    verify
+  }: {
+    user_id: string
+    verify: UserVerifyStatus
+  }) {
     return signToken({
-      payload: { user_id, token_type: TokenType.EmailVerifyToken },
+      payload: { user_id, token_type: TokenType.EmailVerifyToken, verify },
       options: { expiresIn: process.env.EMAIL_VERIFY_TOKEN_EXPIRE_IN },
       privateKey: process.env.JWT_SECRET_EMAIL_VERIFY_TOKEN as string
     })
@@ -55,10 +89,16 @@ class UserSerivce {
     })
   }
 
-  private signToken(user_id: string) {
+  private signToken({
+    user_id,
+    verify
+  }: {
+    user_id: string
+    verify: UserVerifyStatus
+  }) {
     return Promise.all([
-      this.signAccessToken(user_id),
-      this.signRefreshToken(user_id)
+      this.signAccessToken({ user_id, verify }),
+      this.signRefreshToken({ user_id, verify })
     ])
   }
 
@@ -67,8 +107,17 @@ class UserSerivce {
     return user
   }
 
-  async login(user_id: string) {
-    const [access_token, refresh_token] = await this.signToken(user_id)
+  async login({
+    user_id,
+    verify
+  }: {
+    user_id: string
+    verify: UserVerifyStatus
+  }) {
+    const [access_token, refresh_token] = await this.signToken({
+      user_id,
+      verify
+    })
 
     const { iat, exp } = await this.decodeRefreshToken(refresh_token)
 
@@ -88,9 +137,10 @@ class UserSerivce {
     // insert là 1 cái hàm của monggo cung cấp
     const user_id = new ObjectId() // tạo đối tượng _id
 
-    const email_verify_token = await this.signEmailVerifyToken(
-      user_id.toString()
-    )
+    const email_verify_token = await this.signEmailVerifyToken({
+      user_id: user_id.toString(),
+      verify: UserVerifyStatus.Unverified //bởi vì dây là đằng ký nên là chưa verify
+    })
 
     await databaseService.users.insertOne(
       new User({
@@ -103,9 +153,10 @@ class UserSerivce {
       })
     )
 
-    const [access_token, refresh_token] = await this.signToken(
-      user_id.toString()
-    )
+    const [access_token, refresh_token] = await this.signToken({
+      user_id: user_id.toString(),
+      verify: UserVerifyStatus.Unverified
+    })
 
     const { iat, exp } = await this.decodeRefreshToken(refresh_token)
 
@@ -143,7 +194,10 @@ class UserSerivce {
       }
     ])
 
-    const [access_token, refresh_token] = await this.signToken(user_id)
+    const [access_token, refresh_token] = await this.signToken({
+      user_id,
+      verify: UserVerifyStatus.Verified
+    })
 
     const { iat, exp } = await this.decodeRefreshToken(refresh_token)
     await databaseService.refreshTokens.insertOne(
@@ -159,14 +213,17 @@ class UserSerivce {
   }
 
   async resendEmailVerify(user_id: string) {
-    const email_verify_token = await this.signEmailVerifyToken(user_id)
+    const email_verify_token = await this.signEmailVerifyToken({
+      user_id,
+      verify: UserVerifyStatus.Verified
+    })
     console.log('resend_Email_Verify_Token', email_verify_token)
 
     await databaseService.users.updateOne({ _id: new ObjectId(user_id) }, [
       {
         $set: {
           email_verify_token,
-          update_at: '$$NOW'
+          updated_at: '$$NOW'
         }
       }
     ])
@@ -226,6 +283,58 @@ class UserSerivce {
         }
       }
     )
+    return user
+  }
+
+  async updateMe(user_id: string, payload: UpdateMeReqBody) {
+    const _payload = payload.date_of_birth
+      ? { ...payload, date_of_birth: new Date(payload.date_of_birth) }
+      : payload
+    //cập nhật _payload lên db
+    const user = await databaseService.users.findOneAndUpdate(
+      { _id: new ObjectId(user_id) },
+      [
+        {
+          $set: {
+            ..._payload,
+            updated_at: '$$NOW'
+          }
+        }
+      ],
+      {
+        returnDocument: 'after', //trả về document sau khi update, nếu k thì nó trả về document cũ
+        projection: {
+          //chặn các property k cần thiết
+          password: 0,
+          email_verify_token: 0,
+          forgot_password_token: 0
+        }
+      }
+    )
+    return user
+  }
+
+  async getProfile(username: string) {
+    const user = await databaseService.users.findOne(
+      {
+        username
+      },
+      {
+        projection: {
+          password: 0,
+          email_verify_token: 0,
+          forgot_password_token: 0
+        }
+      }
+    )
+
+    if (!user) {
+      throw new ErrorWithStatus({
+        status: HTTP_STATUS.NOT_FOUND,
+        message: USERS_MESSAGES.USER_NOT_FOUND
+      })
+    }
+
     return user
   }
 }

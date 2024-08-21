@@ -41,3 +41,18 @@ export interface ResetPassWordReq {
   confirm_password: string
   forgot_password_token: string
 }
+
+export interface UpdateMeReqBody {
+  name?: string
+  date_of_birth?: string //vì ngta truyền lên string dạng ISO8601, k phải date
+  bio?: string
+  location?: string
+  website?: string
+  username?: string
+  avatar?: string
+  cover_photo?: string
+}
+
+export interface GetProfileParams {
+  username: string
+}

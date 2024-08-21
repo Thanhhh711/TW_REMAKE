@@ -2,11 +2,13 @@ import { Request, Response, NextFunction } from 'express'
 
 import {
   ForgotPassWordReqBody,
+  GetProfileParams,
   LoginReqBody,
   LogoutReqBody,
   RegisterReqBody,
   ResetPassWordReq,
   TokenPayload,
+  UpdateMeReqBody,
   VerifyEmailReqBody,
   VerifyForgotPassWordReqBody
 } from '~/models/requests/User.requests'
@@ -27,7 +29,10 @@ export const loginController = async (
   const user = req.user as User
   const user_id = user._id as ObjectId // do là object user_id
 
-  const result = await userSerivce.login(user_id.toString())
+  const result = await userSerivce.login({
+    user_id: user_id.toString(),
+    verify: user.verify
+  })
   // throw new Error('Tạo thử 1 cái lỗi nè')
   return res.json({
     message: USERS_MESSAGES.LOGIN_SUCCESS,
@@ -169,4 +174,31 @@ export const getMeController = async (req: Request, res: Response) => {
     message: USERS_MESSAGES.GET_ME_SUCCESS,
     result
   })
+}
+
+export const updateMeController = async (
+  req: Request<ParamsDictionary, any, UpdateMeReqBody>,
+  res: Response
+) => {
+  // muốn update thì cần user_id, và các thông tin cần update
+  const { user_id } = req.decoded_authorization as TokenPayload
+  const { body } = req
+  //update lại user
+  const result = await userSerivce.updateMe(user_id, body)
+  return res.json({
+    message: USERS_MESSAGES.UPDATE_ME_SUCCESS,
+    result
+  })
+}
+
+export const getProfileController = async (
+  req: Request<GetProfileParams>,
+  res: Response,
+  next: NextFunction
+) => {
+  const { username } = req.params
+
+  const result = await userSerivce.getProfile(username)
+
+  return res.json({ message: USERS_MESSAGES.GET_PROFILE_SUCCESS, result })
 }
